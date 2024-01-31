@@ -12,7 +12,7 @@ import os
 import requests
 
 
-os.environ["NVReranker_URL"] = "http://35.232.96.106:1976/ranking"
+nim_url = os.environ["NVReranker_URL"] 
 
 
 class NVRerank(BaseDocumentCompressor):
@@ -26,8 +26,8 @@ class NVRerank(BaseDocumentCompressor):
           "query": {"text": query},
           "passages": [{"text": passage} for passage in documents]
         }
-        url="http://35.232.96.106:1976/ranking"
-        response = requests.post(url, json=request)
+        
+        response = requests.post(nim_url, json=request)
         #print(response.json())
         rankings = response.json()["rankings"] # list of {"index": int, "score": float} with length equal to passages
         idx=[rankings[i]['index'] for i in range(topN)]
