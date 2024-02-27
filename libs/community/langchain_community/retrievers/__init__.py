@@ -73,6 +73,7 @@ from langchain_community.retrievers.wikipedia import WikipediaRetriever
 from langchain_community.retrievers.you import YouRetriever
 from langchain_community.retrievers.zep import ZepRetriever
 from langchain_community.retrievers.zilliz import ZillizRetriever
+from langchain_community.retrievers.nv_retriever_microservices import NvidiaRetrieverMicroservice
 
 __all__ = [
     "AmazonKendraRetriever",
@@ -97,6 +98,7 @@ __all__ = [
     "LlamaIndexRetriever",
     "MetalRetriever",
     "MilvusRetriever",
+    "NvidiaRetrieverMicroservice",
     "OutlineRetriever",
     "PineconeHybridSearchRetriever",
     "PubMedRetriever",
