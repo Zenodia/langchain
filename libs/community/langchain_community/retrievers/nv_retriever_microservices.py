@@ -5,6 +5,41 @@ from langchain_core.documents import Document
 from langchain_core.pydantic_v1 import BaseModel
 from langchain_core.retrievers import BaseRetriever
 import requests
+import json
+import base64
+
+
+
+
+retriever_base = "http://localhost:1984/v1"
+
+
+def encode_file_to_base64(filename: str) -> str:
+    """Encode file content to base64."""
+    with open(filename, "rb") as file:
+        return base64.b64encode(file.read()).decode("utf-8")
+
+
+def is_pdf(filename: str) -> bool:
+    """Check if the file is a PDF based on its extension."""
+    return filename.lower().endswith(".pdf")
+
+def fetch_collection_id(collection_name, pipeline, endpoint_url):    
+    """implement curl to request """
+    headers = {
+        # Already added when you pass json=
+        # 'Content-Type': 'application/json',
+    }
+
+    json_data = {
+        'name': collection_name,
+        'pipeline': pipeline,
+    }
+
+    response = requests.post(endpoint_url, headers=headers, json=json_data)
+    d=response.text
+    outd=json.loads(d)
+    return outd['collection']['id']  
 
 
 class NvidiaRetrieverMicroservice(BaseRetriever):
@@ -33,10 +68,13 @@ class NvidiaRetrieverMicroservice(BaseRetriever):
                 },
             )
     """
+    def __init__(self, collection_name:str, pipeline:str, endpoint_url:str):
+            super().__init__(collection_name, pipeline, endpoint_url)
+            self.collection_name = collection_name
+            self.pipeline = pipeline
+            self.endpoint_url = enpoint_url # 'http://localhost:1984/v1/collections'
+            self.collection_id = fetch_collection_id(self.collection_name, self.pipeline, self.endpoint_url)
 
-    collection_id: str
-    endpoint_url: str
-    
     def _get_relevant_documents(
         self, query: str, *, run_manager: CallbackManagerForRetrieverRun
     ) -> List[Document]:
@@ -51,7 +89,7 @@ class NvidiaRetrieverMicroservice(BaseRetriever):
         }
 
         response = requests.post(
-            f"{endpoint_url}/collections/{collection_id}/search",
+            f"{self.endpoint_url}/{self.collection_id}/search",
             headers=headers,
             json=json_data,
         )
@@ -74,3 +112,59 @@ class NvidiaRetrieverMicroservice(BaseRetriever):
             )
 
         return documents
+
+    def upload_documents(self, file_path:str) -> str:
+        
+        metadata_dict={}
+        # Construct the URL
+        url = f"{self.endpoint_url}/{self.collection_id}/documents"
+        
+
+        # Check if the file is a PDF and encode it if it is
+        if is_pdf(file_path):
+            encoded_content: str = encode_file_to_base64(filename)
+            format_type: str = "pdf"
+        else:
+            with open(file_path, "r") as file:
+                encoded_content = file.read()
+            format_type: str = "txt"
+
+        # Prepare the payload
+        payload = {
+            "metadata": metadata_dict,
+            "content": encoded_content,
+            "format": format_type,
+        }
+
+        # Make the POST request
+        response = requests.post(url, json=[payload])
+
+        # Print response
+        print(response.status_code)  # noqa: T201
+        if response.status_code == '200':
+            d=response.json()
+            #print(d)
+            return True, d['documents'][0]['id']
+        else:
+            print("please visit NVIDIA Retriever Microservice user guide : abc_url for furtehr debugging")
+            return False, None
+
+
+    def add_documents(self, documents: List[Document], **kwargs: Any) -> List[str]:
+        """Run more documents through the embeddings and add to the vectorstore.
+
+        Args:
+            documents (List[Document]: Documents to add to the vectorstore.
+
+        Returns:
+            List[str]: List of IDs of the added texts.
+        """
+        # TODO: Handle the case where the user doesn't provide ids on the Collection
+        fname_ls = [doc.page_content for doc in documents]
+        f_path_ls = [doc.metadata['source'] for doc in documents]
+        ids=[]
+        for f_path in f_path_ls:
+            flag, idx =upload_documents(f_path)
+            if flag:            
+                idx.append(idx)
+        return ids

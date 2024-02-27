@@ -14,7 +14,7 @@
 
     Document, <name>TextSplitter
 """
-
+from langchain_community.document_loaders.filepathloader import BasicFilePathLoader
 from langchain_community.document_loaders.acreom import AcreomLoader
 from langchain_community.document_loaders.airbyte import (
     AirbyteCDKLoader,
@@ -230,7 +230,6 @@ from langchain_community.document_loaders.youtube import (
     GoogleApiYoutubeLoader,
     YoutubeLoader,
 )
-from langchain_community.document_loaders.filepathloader import BasicFilePathLoader
 
 # Legacy: only for backwards compatibility. Use PyPDFLoader instead
 PagedPDFSplitter = PyPDFLoader
