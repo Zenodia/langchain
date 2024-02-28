@@ -7,11 +7,8 @@ from langchain_core.retrievers import BaseRetriever
 import requests
 import json
 import base64
+from langchain_community.utilities.nvretriever import fetch_collection_id
 
-
-
-
-retriever_base = "http://localhost:1984/v1"
 
 
 def encode_file_to_base64(filename: str) -> str:
@@ -23,9 +20,8 @@ def encode_file_to_base64(filename: str) -> str:
 def is_pdf(filename: str) -> bool:
     """Check if the file is a PDF based on its extension."""
     return filename.lower().endswith(".pdf")
-
+"""
 def fetch_collection_id(collection_name, pipeline, endpoint_url):    
-    """implement curl to request """
     headers = {
         # Already added when you pass json=
         # 'Content-Type': 'application/json',
@@ -39,7 +35,7 @@ def fetch_collection_id(collection_name, pipeline, endpoint_url):
     response = requests.post(endpoint_url, headers=headers, json=json_data)
     d=response.text
     outd=json.loads(d)
-    return outd['collection']['id']  
+    return outd['collection']['id']  """
 
 
 class NvidiaRetrieverMicroservice(BaseRetriever):
@@ -68,12 +64,18 @@ class NvidiaRetrieverMicroservice(BaseRetriever):
                 },
             )
     """
-    def __init__(self, collection_name:str, pipeline:str, endpoint_url:str):
-            super().__init__(collection_name, pipeline, endpoint_url)
-            self.collection_name = collection_name
-            self.pipeline = pipeline
-            self.endpoint_url = enpoint_url # 'http://localhost:1984/v1/collections'
-            self.collection_id = fetch_collection_id(self.collection_name, self.pipeline, self.endpoint_url)
+
+    collection_name : str
+    pipeline : str
+    endpoint_url :str
+    collection_id : str
+    def __init__(self, collection_name, pipeline , endpoint_url, collection_id, **kwargs: Any) -> None:        
+        super().__init__( collection_name=collection_name, pipeline=pipeline , endpoint_url=endpoint_url , collection_id=collection_id)
+
+        self.collection_name = collection_name
+        self.pipeline = pipeline
+        self.endpoint_url = endpoint_url
+        self.collection_id = fetch_collection_id(collection_name, pipeline, endpoint_url)
 
     def _get_relevant_documents(
         self, query: str, *, run_manager: CallbackManagerForRetrieverRun
@@ -140,13 +142,13 @@ class NvidiaRetrieverMicroservice(BaseRetriever):
         response = requests.post(url, json=[payload])
 
         # Print response
-        print(response.status_code)  # noqa: T201
-        if response.status_code == '200':
+        #print(type(response.status_code))  # noqa: T201
+        if response.status_code == 200:
             d=response.json()
             #print(d)
             return True, d['documents'][0]['id']
         else:
-            print("please visit NVIDIA Retriever Microservice user guide : abc_url for furtehr debugging")
+            print(f"{response.status_code} please visit NVIDIA Retriever Microservice user guide : abc_url for further debugging")
             return False, None
 
 
@@ -164,7 +166,44 @@ class NvidiaRetrieverMicroservice(BaseRetriever):
         f_path_ls = [doc.metadata['source'] for doc in documents]
         ids=[]
         for f_path in f_path_ls:
-            flag, idx =upload_documents(f_path)
+            flag, idx =self.upload_documents(f_path)
             if flag:            
-                idx.append(idx)
+                ids.append(idx)
         return ids
+
+    def _get_relevant_documents(
+        self,
+        query: str,
+        *,
+        run_manager: CallbackManagerForRetrieverRun,
+    ) -> List[Document]:
+
+        headers = {
+            # Already added when you pass json=
+            # 'Content-Type': 'application/json',
+        }
+
+        json_data = {
+            'query': query,
+        }
+
+        response = requests.post(f'{self.endpoint_url}/{self.collection_id}/search', headers=headers, json=json_data)
+        #print(response.status_code, type(response.status_code))
+        if response.status_code == 200:
+            d=response.json()
+            #print(d)
+            ls=d['chunks']
+            doc_ls=[]
+            for l in ls:
+                
+                content=l["content"]
+                metadata=l["metadata"]
+                metadata['score']=l['score']                       
+                doc=Document(page_content=content , metadata={"metadata": metadata})
+                doc_ls.append(doc)
+
+            return doc_ls
+        else:
+            print(f"{response.status_code} please visit NVIDIA Retriever Microservice user guide : abc_url for further debugging")
+            return []
+
